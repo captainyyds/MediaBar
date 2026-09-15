@@ -1,0 +1,5 @@
+# Build output
+widget/dist/
+helper/*.dylib
+
+.DS_Store
