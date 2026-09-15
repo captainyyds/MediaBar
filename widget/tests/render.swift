@@ -102,6 +102,14 @@ struct RenderTest {
         collapsed.setArtwork(cover)
         snapshot(collapsed, width: MediaBarView.collapsedWidth, file: "collapsed.png")
 
+        // What Pock's customisation palette shows for this widget.
+        let palette = MediaWidget.imageForCustomization
+        if let tiff = palette.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
+           let png = rep.representation(using: .png, properties: [:]) {
+            try! png.write(to: outDir.appendingPathComponent("customization.png"))
+            print("wrote dist/customization.png")
+        }
+
         print("expanded : \(extents("expanded.png"))")
         print("collapsed: \(extents("collapsed.png"))")
 
@@ -114,6 +122,22 @@ struct RenderTest {
             }
             _ = width
         }
+        // Collapsing must give back whatever layout was there before the bar
+        // took the strip, including a full-width one the user chose for
+        // themselves.
+        let defaults = UserDefaults.standard
+        for base in ["withControlStrip", "fullWidth"] {
+            defaults.set(base, forKey: "layoutStyle")
+            defaults.removeObject(forKey: "MediaBarBaseLayout")
+            MediaBarView.setControlStripHidden(true, live: false)
+            let whileOpen = defaults.string(forKey: "layoutStyle") ?? "?"
+            MediaBarView.setControlStripHidden(false, live: false)
+            let afterClose = defaults.string(forKey: "layoutStyle") ?? "?"
+            print("base \(base): expanded → \(whileOpen), collapsed → \(afterClose)")
+            guard whileOpen == "fullWidth" else { fatalError("did not take the strip from \(base)") }
+            guard afterClose == base else { fatalError("collapsed to \(afterClose), not \(base)") }
+        }
+
         print("RENDER TEST PASSED")
     }
 }

@@ -416,9 +416,28 @@ final class MediaBarView: NSView {
     ///   start-up, when there is no bar to re-present yet and a rebuild costs
     ///   nothing anyway.
     static func setControlStripHidden(_ hidden: Bool, live: Bool = true) {
-        let style = hidden ? "fullWidth" : "withControlStrip"
         let defaults = UserDefaults.standard
-        guard defaults.string(forKey: "layoutStyle") != style else { return }
+        let current = defaults.string(forKey: "layoutStyle") ?? "withControlStrip"
+
+        // Collapsing gives back the layout that was there before, not one this
+        // widget assumed. Someone who runs Pock full-width on purpose would
+        // otherwise find that setting quietly changed the first time they
+        // collapsed the bar.
+        let style: String
+        if hidden {
+            // Recorded whatever it is, including a full-width one already: the
+            // first version skipped that case and collapsed a user who had
+            // chosen full width back to the Control Strip, which is the exact
+            // thing this is here to prevent.
+            if defaults.string(forKey: "MediaBarBaseLayout") == nil {
+                defaults.set(current, forKey: "MediaBarBaseLayout")
+            }
+            style = "fullWidth"
+        } else {
+            style = defaults.string(forKey: "MediaBarBaseLayout") ?? "withControlStrip"
+            defaults.removeObject(forKey: "MediaBarBaseLayout")
+        }
+        guard current != style else { return }
         defaults.set(style, forKey: "layoutStyle")
         if live, present(placement: hidden ? 1 : 0) { return }
         NotificationCenter.default.post(name: NSNotification.Name("shouldReloadPock"), object: nil)

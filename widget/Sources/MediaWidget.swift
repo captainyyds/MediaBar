@@ -94,6 +94,29 @@ public final class MediaWidget: NSObject, PKWidget {
     // widget that only answers `viewDidDisappear` is never told to stop on
     // those — which is how an instance whose view was long gone kept its timer
     // running and its readings going.
+    /// What Pock shows in its customisation palette.
+    ///
+    /// Without this the palette falls back to the widget's live view, which
+    /// collapsed is a 34pt ring with no label — unreadable as an entry in a
+    /// list, and it means a second live instance while the palette is open.
+    @objc public static var imageForCustomization: NSImage {
+        let size = NSSize(width: 118, height: 30)
+        return NSImage(size: size, flipped: false) { rect in
+            if let icon = NSImage(systemSymbolName: "waveform", accessibilityDescription: nil)?
+                .withSymbolConfiguration(NSImage.SymbolConfiguration(paletteColors: [.white])) {
+                icon.draw(in: NSRect(x: 10, y: (rect.height - 15) / 2, width: 15, height: 15))
+            }
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+                .foregroundColor: NSColor.white,
+            ]
+            let text = "Media Bar" as NSString
+            let textSize = text.size(withAttributes: attrs)
+            text.draw(at: NSPoint(x: 33, y: (rect.height - textSize.height) / 2), withAttributes: attrs)
+            return true
+        }
+    }
+
     @objc public static func viewWillAppear() { shared?.start() }
     @objc public static func viewDidAppear() { shared?.start() }
     @objc public static func viewWillDisappear() { shared?.stop() }
