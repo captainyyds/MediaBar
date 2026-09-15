@@ -438,6 +438,18 @@ final class MediaBarView: NSView {
     /// runtime. Every step is checked, so a future Pock that renames any of it
     /// makes this return false instead of crashing, and the caller falls back
     /// to the reload that always works.
+    /// Whether macOS draws its close box at the left of a system-modal Touch
+    /// Bar. Pock keeps it off; presenting without turning it off again leaves
+    /// an ✕ in front of the bar that quits Pock's bar when pressed.
+    private static func setCloseBoxVisible(_ visible: Bool) {
+        guard let handle = dlopen(
+            "/System/Library/PrivateFrameworks/DFRFoundation.framework/DFRFoundation",
+            RTLD_NOW
+        ), let symbol = dlsym(handle, "DFRSystemModalShowsCloseBoxWhenFrontMost") else { return }
+        typealias Show = @convention(c) (DarwinBoolean) -> Void
+        unsafeBitCast(symbol, to: Show.self)(DarwinBoolean(visible))
+    }
+
     @discardableResult
     private static func present(placement: Int) -> Bool {
         let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Pock"
@@ -466,9 +478,23 @@ final class MediaBarView: NSView {
         guard helper.responds(to: dismissSelector) else { return false }
         helper.perform(dismissSelector, with: bar)
 
+        // Set before presenting as well as after: the close box is decided as
+        // the bar goes up, so asking for it to be gone afterwards is a request
+        // to remove something already drawn.
+        setCloseBoxVisible(false)
+
         typealias Present = @convention(c) (AnyObject, Selector, NSTouchBar, Int, NSString?) -> Void
         let present = unsafeBitCast(method_getImplementation(method), to: Present.self)
         present(NSTouchBar.self, selector, bar, placement, nil)
+        setCloseBoxVisible(false)
+
+        // Presenting is two steps, and replacing the first meant losing the
+        // second. macOS puts a close box at the left of any system-modal Touch
+        // Bar; Pock takes it away again immediately afterwards, which is why
+        // one never appears on its own presentations. Skipping that left an ✕
+        // sitting in front of the bar after the first expand or collapse.
+        let hideCloseBox = Selector(("hideCloseButtonIfNeeded"))
+        if helper.responds(to: hideCloseBox) { helper.perform(hideCloseBox) }
         return true
     }
 
