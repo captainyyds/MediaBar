@@ -54,9 +54,18 @@ static void emit(GetInfo getInfo, GetPID getPID) { @autoreleasepool {
         NSNumber *value = field(info, name);
         if ([value isKindOfClass:NSNumber.class]) out[name.lowercaseString] = value;
     }
-    // The anchor the live position is measured from: elapsed was true *then*,
-    // and the wall clock carries it forward from there without asking again.
-    NSDate *anchor = field(info, @"CurrentPlaybackDate");
+    // The anchor the live position is carried from: the moment the elapsed
+    // time was true. That is `Timestamp`, when the info was published — not
+    // `CurrentPlaybackDate`, which is the real-world date of the playback
+    // position and only means something for a broadcast. Chrome happens to set
+    // the two close together, which is how using the wrong one went unnoticed;
+    // 汽水音乐 leaves CurrentPlaybackDate on one fixed day for every track, and
+    // carrying from it put each of them twelve days past its end, pinned full.
+    //
+    // No fallback to CurrentPlaybackDate when Timestamp is missing: without an
+    // anchor the widget shows the elapsed time standing still, which is at
+    // worst stale, where a wrong anchor is wrong by any amount at all.
+    NSDate *anchor = field(info, @"Timestamp");
     if ([anchor isKindOfClass:NSDate.class]) out[@"anchor"] = @(anchor.timeIntervalSince1970);
 
     NSData *artwork = field(info, @"ArtworkData");
